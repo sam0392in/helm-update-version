@@ -7,7 +7,6 @@ package proc
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -19,6 +18,17 @@ import (
 var (
 	logger *zap.Logger
 )
+
+type chartVersion struct {
+	major  string
+	minor  string
+	hotfix string
+}
+
+type chartInfo struct {
+	version     chartVersion
+	placeholder int
+}
 
 func init() {
 	logger, _ = zap.NewProduction()
@@ -40,14 +50,12 @@ func readChart(dir string) []string {
 	return fc
 }
 
-func updateChart(dir string, chartInfo []float32, val float32) {
+func updateChart(dir string, chartinfo chartInfo) {
 	file := dir + "/Chart.yaml"
-	currentVersion := chartInfo[0]
-	new := currentVersion + val
-	newVersion := fmt.Sprintf("%.2f", new)
-	lineNo := int(chartInfo[1])
+	new_version := chartinfo.version.major + "." + chartinfo.version.minor + "." + chartinfo.version.hotfix
+	lineNo := chartinfo.placeholder
 	data := readChart(dir)
-	data[lineNo] = "version: \"" + newVersion + "\""
+	data[lineNo] = "version: \"" + new_version + "\""
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Error(err.Error())
@@ -58,25 +66,27 @@ func updateChart(dir string, chartInfo []float32, val float32) {
 	}
 	datawriter.Flush()
 	logger.Info("chartVersion updated",
-		zap.String("chartVersion", newVersion))
+		zap.String("chartVersion", new_version))
 	f.Close()
 }
 
-func getChartVersion(dir string) []float32 {
-	var chartinfo []float32
+func getChartVersion(dir string) chartInfo {
+	var chartinfo chartInfo
+	var version chartVersion
 	data := readChart(dir)
 	for i, l := range data {
 		check, _ := regexp.MatchString("version", l)
 		if check {
 			s := strings.Split(l, ":")
-			ver := strings.ReplaceAll(s[1], "\"", "")
-			ver = strings.ReplaceAll(ver, " ", "")
-			version, err := strconv.ParseFloat(ver, 32)
-			if err != nil {
-				logger.Error(err.Error())
-			}
-			chartinfo = append(chartinfo, float32(version))
-			chartinfo = append(chartinfo, float32(i))
+			trimed_s := strings.ReplaceAll(s[1], "\"", "")
+			trimed_s = strings.ReplaceAll(trimed_s, " ", "")
+			ver := strings.Split(trimed_s, ".")
+			version.major = ver[0]
+			version.minor = ver[1]
+			version.hotfix = ver[2]
+
+			chartinfo.version = version
+			chartinfo.placeholder = i
 			break
 		}
 	}
@@ -84,25 +94,46 @@ func getChartVersion(dir string) []float32 {
 }
 
 func BumpVersion(dir, changetype string) {
-	chartInfo := getChartVersion(dir)
+	currentchartInfo := getChartVersion(dir)
 	logger.Info("read chart version successful",
-		zap.Float32("chartVersion", chartInfo[0]),
+		zap.String("chartVersion", currentchartInfo.version.major+"."+currentchartInfo.version.minor+"."+currentchartInfo.version.hotfix),
 	)
-	var val float32
+	newChartInfo := currentchartInfo
+	newVersion := currentchartInfo.version
 	switch {
 	case changetype == "nil":
-		val = 0
 		logger.Info("no change in chartVersion")
 	case changetype == "minor":
-		val = 0.1
+		min, error := strconv.Atoi(newVersion.minor)
+		if error != nil {
+			logger.Error(error.Error())
+		} else {
+			newMinor := min + 1
+			newVersion.minor = strconv.Itoa(newMinor)
+		}
 	case changetype == "major":
-		val = 1.0
+		maj, error := strconv.Atoi(newVersion.major)
+		if error != nil {
+			logger.Error(error.Error())
+		} else {
+			newMajor := maj + 1
+			newVersion.major = strconv.Itoa(newMajor)
+		}
 	case changetype == "hotfix":
-		val = 0.01
+		hot, error := strconv.Atoi(newVersion.major)
+		if error != nil {
+			logger.Error(error.Error())
+		} else {
+			newHotfix := hot + 1
+			newVersion.hotfix = strconv.Itoa(newHotfix)
+		}
 	default:
-		logger.Info("no change in chartVersion")
+		logger.Panic("no valid parameter passed in -b",
+			zap.String("validChoices", "major/minor/hotfix"),
+		)
 	}
-	if val != 0 {
-		updateChart(dir, chartInfo, val)
+	if changetype != "nil" {
+		newChartInfo.version = newVersion
+		updateChart(dir, newChartInfo)
 	}
 }
