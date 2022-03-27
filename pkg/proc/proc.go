@@ -120,7 +120,7 @@ func BumpVersion(dir, changetype string) {
 			newVersion.major = strconv.Itoa(newMajor)
 		}
 	case changetype == "hotfix":
-		hot, error := strconv.Atoi(newVersion.major)
+		hot, error := strconv.Atoi(newVersion.hotfix)
 		if error != nil {
 			logger.Error(error.Error())
 		} else {
