@@ -1,21 +1,31 @@
 # Helm Update Version
 This project gives an easy solution to bump up the helm chart version using simple binary.
 
-## Runtime parameters
-Binary accepts chart directory and changetype (major/minor/hotfix) as an user input.
-By default changetype is none and it will not update the chart version.
-
-- ( -d ) : helm chart directory
-- ( -b ) : major/minor/hostfix. default is nil
-
 ## Usage
+```
+Usage:
+  helm-update-version [flags]
 
-### Read chart version
-```
-helm-update-version -d <HELM-CHART-DIR>
+Flags:
+  -c, --changetype string   major/minor/hotfix
+  -d, --directory string    Directory containing the Helm chart
+  -h, --help                help for helm-update-version
+      --verbose             detailed output
+  -v, --version string      Specific version to update to
+
 ```
 
-### Update chart version
+### when helm chart has standard version [major.minor.hotfix]
 ```
-helm-update-version -d <HELM-CHART-DIR> -b <major/minor/hotfix>
+helm-update-version -d . -c major
+```
+
+### when you want your version to be placed in chart
+```
+helm-update-version -v <YOUR VERSION>
+```
+
+### when you want your version (standard format) to be placed in chart and updated
+```
+helm-update-version -v <YOUR VERSION> -c major
 ```
